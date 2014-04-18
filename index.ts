@@ -16,10 +16,29 @@ var construct = (service: Function, args: Array < any > ) => {
 
 class NestContainerRegistratorBasic implements Nest.IContainerRegistrator {
 
-    constructor(public app: Nest.INest) {}
+    q: Nest.IAsync;
+    container: Nest.IContainer;
 
-    register(service: Nest.ServiceFunction) {
-        
+    constructor(app: Nest.INest) {
+        var q = app.modules.filter((x, i, a) => {
+            return x.key === 'IAsync';
+        })[0];
+        if (!q)
+            throw 'IAsync was not found on app, but is required for NestContainerRegistratorBasic';
+
+        var container = app.modules.filter((x, i, a) => {
+            return x.key === 'IContainer';
+        })[0];
+
+        if (!container)
+            throw 'IContainer was not found on app, but is required for NestContainerRegistratorBasic';
+
+        this.q = q.instance;
+        this.container = container.instance;
+    }
+
+    register(service: Nest.ModuleFunction) {
+
         var name = service.$serviceName;
         var key = service.$serviceKey;
         var factory = service.$serviceFactory;
@@ -53,8 +72,8 @@ class NestContainerRegistratorBasic implements Nest.IContainerRegistrator {
                         args = [];
 
                     factory = () => {
-                        return this.app.q.all(args.map((v, i, a) => {
-                            return this.app.container.get(v);
+                        return this.q.all(args.map((v, i, a) => {
+                            return this.container.require(v);
                         }))
                             .then((args: Array < any > ) => {
                                 return construct(service, args);
@@ -65,13 +84,16 @@ class NestContainerRegistratorBasic implements Nest.IContainerRegistrator {
         }
 
         if (name && key && factory)
-            this.app.container.register(name, key, factory);
+            this.container.define(name, key, factory);
 
         return this;
     }
 }
 
-module.exports.step = function (app: Nest.INest): Nest.INest {
-    app.data["IContainerRegistrator"] = new NestContainerRegistratorBasic(app);
-    return app;
+module.exports.step = function(app: Nest.INest, done: () => any) {
+    app.modules.push({
+        name: 'IContainerRegistrator',
+        key: 'NestContainerRegistratorBasic',
+        instance: new NestContainerRegistratorBasic(app),
+    });
 }
