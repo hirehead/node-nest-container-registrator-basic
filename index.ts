@@ -62,9 +62,12 @@ class NestContainerRegistratorBasic implements Nest.IContainerRegistrator {
                 }
 
                 if (factory === undefined) {
+
                     var args: Array < string > ;
 
-                    if (parts[2].length > 0)
+                    if (!service.$serviceInject)
+                        args = service.$serviceInject
+                    else if (parts[2].length > 0)
                         args = parts[2].split(FN_ARG_SPLIT).map((v, i, a) => {
                             return 'I' + v.charAt(0).toUpperCase() + v.slice(1);
                         });
@@ -80,7 +83,8 @@ class NestContainerRegistratorBasic implements Nest.IContainerRegistrator {
                             });
                     };
                 }
-            }
+            } else
+                'NestContainerRegistratorBasic was not able to parse function: ' + service.toString();
         }
 
         if (name && key && factory)
